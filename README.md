@@ -1,8 +1,12 @@
 # Playing with Influx from FSI
 
-This little set of scripts allows you to play with an InfluxDB instance form an FSI session, with built in FsEye and FSharp.Charting support.
+This little set of scripts allows you to play with an InfluxDB instance from an F# interactive session, with built in FsEye and FSharp.Charting support.
 
 Unfortunately, this little demo environment is Windows only :(.
+
+Check out the repo somewhere locally, and then follow the steps below!
+
+## Set up
 
 Open ``Setup.fsx`` and add the relevant credentials (Influx supply a free playground at http://play.influxdb.org/ if you don't want to download it yourself).
 
@@ -27,7 +31,7 @@ type MyEvent = { Name : string; Metric : float }
 client.Write ("EventStreamName", { Name = "Bob"; Metric = 1.0 });;
 ```
 
-That should return ``val it : unit = ()`` and you should have a record in your database. FsEye should have also popped up showing you the current state of values in FSI. It will return ``unit`` regardless of whether it succeeds or fails, so that's something to be aware of...
+That should return ``val it : unit = ()`` and you should have a record in your database. FsEye should have also popped up showing you the current state of values in FSI. It will return ``unit`` regardless of whether it succeeds or fails, so that's something to be aware of... (I think I mentioned the client is in progress!)
 
 Let's create 1,000 more:
 
@@ -38,7 +42,9 @@ let create () = { Name = "Bob"; Metric = rand.NextDouble() }
 [ for _ in 1..1000 -> client.Write ("EventStreamName", create()) ];;
 ```
 
-And then let's get them all back:
+## Query the data
+
+The client exposes a ``Query`` method if you know a specific type you want to deserialize to, or ``QueryRaw`` if you don't. Using ``Query`` looks a bit like this:
 
 ``` fsharp
 client.Query<MyEvent> "select * from EventStreamName"
@@ -47,7 +53,7 @@ client.Query<MyEvent> "select * from EventStreamName"
 
 A ``Choice<seq<Influx.Client.QueryResult<MyEvent>>,Influx.Client.QueryFailure>`` you say? Obviously... (This might be a good moment to say that you can just view results in the Influx admin dashboard as well).
 
-Lets right a quick helper that assumes that the query succeeds, and that the query only returns results from a single time series. Don't do this in production :) .
+Lets write a quick helper that assumes that the query succeeds, and that the query only returns results from a single time series. Don't do this in production :) .
 
 ``` fsharp
 let querySingleStream<'T> query =
@@ -61,6 +67,8 @@ let querySingleStream<'T> query =
 Finally, let's graph the results:
 
 ``` fsharp
+let bobs = querySingleStream<MyEvent> "select * from EventStreamName"
+
 open FSharp.Charting
 Chart.Line (bobs.Values |> List.mapi (fun i b -> (i, b.Metric)));;
 ```
